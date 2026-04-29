@@ -1,7 +1,16 @@
-// Mirrors of backend pydantic models — kept in one place so component imports stay tidy.
+/**
+ * File: types.ts
+ * Version: 1.1.0
+ * Created At: 2026-04-25
+ * Updated At: 2026-04-29
+ * Description: TypeScript interface definitions. Mirrors the backend Pydantic 
+ *              models to ensure end-to-end type safety for API requests and responses.
+ */
 
+/** Supported AI Providers */
 export type Provider = 'openai' | 'gemini' | 'anthropic';
 
+/** Configuration for connecting to a PostgreSQL instance. */
 export interface PostgresCredentials {
   host: string;
   port: number;
@@ -11,18 +20,21 @@ export interface PostgresCredentials {
   sslmode?: string;
 }
 
+/** Basic metadata for a database column. */
 export interface ColumnInfo {
   name: string;
   data_type: string;
   is_nullable: boolean;
 }
 
+/** Describes a relationship between tables. */
 export interface ForeignKey {
   column: string;
   references_table: string;
   references_column: string;
 }
 
+/** Detailed metadata for a database table. */
 export interface TableInfo {
   schema: string;
   name: string;
@@ -31,38 +43,45 @@ export interface TableInfo {
   approx_row_count: number | null;
 }
 
+/** Collection of all tables in the database schema. */
 export interface SchemaSummary {
   tables: TableInfo[];
 }
 
+/** User preferences for AI model and credentials. */
 export interface AIConfig {
   provider: Provider;
   api_key: string;
   model: string;
 }
 
+/** Basic metadata for a supported AI model. */
 export interface ModelInfo {
   id: string;
   label: string;
 }
 
+/** Results of a SQL query execution. */
 export interface TableResult {
   columns: string[];
   rows: unknown[][];
   truncated: boolean;
 }
 
+/** Visualization configuration compatible with Plotly. */
 export interface ChartSpec {
   data: Array<Record<string, unknown>>;
   layout: Record<string, unknown>;
 }
 
+/** Standardized error payload from the backend pipeline. */
 export interface ErrorPayload {
   stage: string;
   message: string;
   hint: string;
 }
 
+/** Unified response from the chat orchestrator. */
 export interface ChatResponse {
   message_id: string;
   sql: string | null;
@@ -72,14 +91,17 @@ export interface ChatResponse {
   error: ErrorPayload | null;
 }
 
+/** Roles permitted in the chat history. */
 export type MessageRole = 'user' | 'assistant';
 
+/** Internal representation of a single chat turn in the UI. */
 export interface ChatMessage {
   id: string;
   role: MessageRole;
-  /** For user messages: the question text. For assistant messages: empty (we use payload). */
+  /** For user: the raw input. For assistant: the response summary. */
   text: string;
-  /** Set on assistant messages once the response arrives. */
+  /** Complete result payload for assistant turns. */
   payload?: ChatResponse;
+  /** UI flag for messages currently being generated. */
   pending?: boolean;
 }
