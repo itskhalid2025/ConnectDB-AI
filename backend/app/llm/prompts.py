@@ -1,7 +1,11 @@
-"""Prompt templates for the SQL-generation and result-analysis steps.
-
-Both prompts deliberately keep the output format strict so we can parse the
-result without extra LLM-side reasoning.
+"""
+File: prompts.py
+Version: 1.2.0
+Created At: 2026-04-25
+Updated At: 2026-04-29
+Description: Standardized prompt templates for the SQL-generation and result-analysis steps.
+             Ensures strict output formats for deterministic processing and high-quality 
+             analytical insights.
 """
 
 from __future__ import annotations
@@ -11,6 +15,9 @@ import json
 from app.llm.base import ChatMessage
 from app.schemas.chat import ChatTurn, TableResult
 
+# -----------------------------------------------------------------------------
+# SQL Generation Prompt
+# -----------------------------------------------------------------------------
 SQL_SYSTEM_PROMPT = """\
 You are a senior PostgreSQL analyst who writes precise read-only SQL.
 
@@ -35,6 +42,18 @@ def build_sql_messages(
     business_notes: str,
     history: list[ChatTurn],
 ) -> list[ChatMessage]:
+    """
+    Constructs a chat payload for the SQL generation LLM call.
+    
+    Args:
+        question: The user's natural language question.
+        schema_text: A text representation of the target database schema.
+        business_notes: authoritatively provided user definitions.
+        history: List of previous chat turns for contextual continuity.
+        
+    Returns:
+        A list of ChatMessage objects (System + User).
+    """
     history_block = ""
     if history:
         rendered = "\n".join(f"{t.role.upper()}: {t.content}" for t in history)
@@ -59,6 +78,9 @@ def build_sql_messages(
     ]
 
 
+# -----------------------------------------------------------------------------
+# Insight Generation Prompt
+# -----------------------------------------------------------------------------
 INSIGHT_SYSTEM_PROMPT = """\
 You are a Senior Analytical Data Engineer. Your goal is to provide high-level executive summaries of data results.
 
@@ -77,6 +99,17 @@ def build_insight_messages(
     table: TableResult,
     max_rows_in_prompt: int = 50,
 ) -> list[ChatMessage]:
+    """
+    Constructs a chat payload for the data-analysis (insight) LLM call.
+    
+    Args:
+        question: Original user question for context.
+        table: The result table returned from SQL execution.
+        max_rows_in_prompt: Safety cap for the number of rows sent to the LLM.
+        
+    Returns:
+        A list of ChatMessage objects (System + User).
+    """
     sample_rows = table.rows[:max_rows_in_prompt]
     payload = {
         "columns": table.columns,

@@ -1,10 +1,26 @@
-import asyncpg
+"""
+File: schema_inspector.py
+Version: 1.1.0
+Created At: 2026-04-25
+Updated At: 2026-04-29
+Description: Database introspection engine. Queries PostgreSQL system catalogs to build a 
+             structured representation of tables, columns, and foreign keys, then formats 
+             them for the LLM context window.
+"""
 
+import asyncpg
+import logging
 from app.schemas.connection import ColumnInfo, ForeignKey, SchemaSummary, TableInfo
 
-# Built-in Postgres schemas we always exclude — only user data is interesting.
+# Initialize logger
+log = logging.getLogger(__name__)
+
+# Built-in Postgres schemas we always exclude — only user data is interesting for analysis.
 SYSTEM_SCHEMAS = ("pg_catalog", "information_schema", "pg_toast")
 
+# --- Optimized Metadata Queries ---
+
+# Fetch all user tables and views
 _TABLES_QUERY = """
 SELECT table_schema, table_name
 FROM information_schema.tables
@@ -13,6 +29,7 @@ WHERE table_type IN ('BASE TABLE', 'VIEW')
 ORDER BY table_schema, table_name
 """
 
+# Fetch column details including data types and nullability
 _COLUMNS_QUERY = """
 SELECT table_schema, table_name, column_name, data_type, is_nullable
 FROM information_schema.columns
@@ -20,6 +37,7 @@ WHERE table_schema NOT IN ('pg_catalog', 'information_schema', 'pg_toast')
 ORDER BY table_schema, table_name, ordinal_position
 """
 
+# Fetch foreign key relationships for join inference
 _FK_QUERY = """
 SELECT
     tc.table_schema,
@@ -38,6 +56,7 @@ WHERE tc.constraint_type = 'FOREIGN KEY'
   AND tc.table_schema NOT IN ('pg_catalog', 'information_schema', 'pg_toast')
 """
 
+# Fetch approximate row counts for query optimization hints
 _ROWCOUNT_QUERY = """
 SELECT n.nspname AS schema, c.relname AS name, c.reltuples::bigint AS approx
 FROM pg_class c
@@ -48,12 +67,22 @@ WHERE c.relkind IN ('r', 'p')
 
 
 async def introspect(pool: asyncpg.Pool) -> SchemaSummary:
+    """
+    Scans the connected database and returns a structured summary.
+    
+    Args:
+        pool: The asyncpg connection pool.
+        
+    Returns:
+        A SchemaSummary object containing all table and relationship metadata.
+    """
     async with pool.acquire() as conn:
         tables_rows = await conn.fetch(_TABLES_QUERY)
         cols_rows = await conn.fetch(_COLUMNS_QUERY)
         fk_rows = await conn.fetch(_FK_QUERY)
         rowcount_rows = await conn.fetch(_ROWCOUNT_QUERY)
 
+    # Group columns by table
     cols_by_table: dict[tuple[str, str], list[ColumnInfo]] = {}
     for r in cols_rows:
         key = (r["table_schema"], r["table_name"])
@@ -65,6 +94,7 @@ async def introspect(pool: asyncpg.Pool) -> SchemaSummary:
             )
         )
 
+    # Group foreign keys by table
     fks_by_table: dict[tuple[str, str], list[ForeignKey]] = {}
     for r in fk_rows:
         key = (r["table_schema"], r["table_name"])
@@ -76,11 +106,13 @@ async def introspect(pool: asyncpg.Pool) -> SchemaSummary:
             )
         )
 
+    # Map approximate row counts
     rowcounts: dict[tuple[str, str], int] = {
         (r["schema"], r["name"]): int(r["approx"]) if r["approx"] is not None else 0
         for r in rowcount_rows
     }
 
+    # Build final TableInfo list
     tables: list[TableInfo] = []
     for r in tables_rows:
         key = (r["table_schema"], r["table_name"])
@@ -97,15 +129,21 @@ async def introspect(pool: asyncpg.Pool) -> SchemaSummary:
     return SchemaSummary(tables=tables)
 
 
-import logging
-log = logging.getLogger(__name__)
-
 def render_schema_for_prompt(summary: SchemaSummary) -> str:
-    """Compact textual representation, optimised for LLM context economy."""
+    """
+    Generates a compact textual representation of the schema.
+    Optimized for LLM context economy while preserving all relationship metadata.
+    
+    Args:
+        summary: The SchemaSummary to render.
+        
+    Returns:
+        A string representation of the schema (e.g., "- table(col:type) [FKs: col -> ref]").
+    """
     lines: list[str] = []
     for t in summary.tables:
         cols = ", ".join(f"{c.name}:{c.data_type}" for c in t.columns)
-        # Use schema_ correctly from the TableInfo model
+        # Note: 'schema_' is used to avoid conflict with protected names in some models
         qualified = f"{t.schema_}.{t.name}" if t.schema_ != "public" else t.name
         line = f"- {qualified}({cols})"
         if t.foreign_keys:
@@ -117,5 +155,7 @@ def render_schema_for_prompt(summary: SchemaSummary) -> str:
         lines.append(line)
     
     schema_text = "\n".join(lines) if lines else "(no user tables found)"
+    
+    # Detailed log for troubleshooting AI hallucinations regarding column names
     log.info("Rendered Schema for Prompt:\n%s", schema_text)
     return schema_text

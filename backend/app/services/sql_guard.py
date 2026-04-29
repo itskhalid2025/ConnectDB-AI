@@ -1,27 +1,23 @@
-"""SQL safety validator.
-
-We only permit read-only operations. The strategy is defence-in-depth:
-1. Strip any markdown fences the LLM might emit.
-2. Parse with sqlglot.
-3. Reject if the input contains more than one statement.
-4. Reject if the root expression is anything other than SELECT or WITH (CTE → SELECT).
-5. Walk the AST and reject if any forbidden node type appears anywhere
-   (defends against `WITH x AS (DELETE ...) SELECT ...`).
-6. Inject a LIMIT clause if the outermost SELECT is missing one.
+"""
+File: sql_guard.py
+Version: 1.1.0
+Created At: 2026-04-25
+Updated At: 2026-04-29
+Description: Security layer for SQL execution. Implements a defense-in-depth strategy to 
+             ensure only read-only, safe, and performant PostgreSQL queries are executed.
 """
 
 from __future__ import annotations
 
 import re
-
 import sqlglot
 from sqlglot import exp
 
 from app.core.errors import UnsafeSQLError
 
+# --- Configuration: Forbidden Operations ---
 # Anything that mutates state, alters schema, manages users, or escapes the SQL
 # context is forbidden. These are checked anywhere in the AST tree.
-# We use a dynamic list to avoid AttributeErrors across different sqlglot versions.
 _FORBIDDEN_NODE_NAMES = [
     "Insert",
     "Update",
@@ -51,7 +47,10 @@ _FORBIDDEN_KEYWORDS_RE = re.compile(
 
 
 def _strip_fences(sql: str) -> str:
-    """LLMs sometimes wrap SQL in ```sql fences despite being told not to."""
+    """
+    LLMs sometimes wrap SQL in markdown fences (```sql) despite instructions. 
+    This utility cleans the raw output.
+    """
     s = sql.strip()
     if s.startswith("```"):
         # remove first fence line
@@ -62,11 +61,15 @@ def _strip_fences(sql: str) -> str:
 
 
 def _has_limit(node: exp.Expression) -> bool:
+    """Check if a SELECT node already contains a LIMIT clause."""
     return node.args.get("limit") is not None
 
 
 def _inject_limit(tree: exp.Expression, max_rows: int) -> exp.Expression:
-    """Add a LIMIT to the outermost SELECT if missing, leaving CTEs alone."""
+    """
+    Safely injects a LIMIT clause into the outermost SELECT statement if missing.
+    Ensures that queries don't accidentally pull millions of rows into memory.
+    """
     target = tree
     if isinstance(tree, exp.With):
         # Walk down to the wrapped SELECT/UNION
@@ -77,7 +80,25 @@ def _inject_limit(tree: exp.Expression, max_rows: int) -> exp.Expression:
 
 
 def validate(sql: str, *, max_rows: int) -> str:
-    """Validate `sql`, raise UnsafeSQLError on rejection, return the safe form."""
+    """
+    The main validation gate for generated SQL.
+    
+    Validation Steps:
+    1. Strip markdown artifacts.
+    2. Fast regex scan for forbidden keywords.
+    3. Parse into AST with sqlglot.
+    4. Ensure single-statement query.
+    5. Ensure root operation is SELECT/WITH.
+    6. Recursive AST walk to detect forbidden nodes (CTE-injection defense).
+    7. Inject performance safeguards (LIMIT).
+    
+    Args:
+        sql: The raw SQL string from the LLM.
+        max_rows: Performance cap for result sets.
+        
+    Returns:
+        A safe, sanitized, and performance-guarded SQL string.
+    """
     if not sql or not sql.strip():
         raise UnsafeSQLError("Empty SQL.", hint="The model didn't return a query — try rephrasing.")
 
@@ -92,7 +113,7 @@ def validate(sql: str, *, max_rows: int) -> str:
 
     try:
         statements = sqlglot.parse(cleaned, read="postgres")
-    except Exception as e:  # sqlglot raises ParseError but also bare exceptions
+    except Exception as e:
         raise UnsafeSQLError(
             f"Could not parse generated SQL: {e}",
             hint="The model produced invalid SQL — try rephrasing your question.",
@@ -124,8 +145,8 @@ def validate(sql: str, *, max_rows: int) -> str:
         )
 
     # Walk the entire tree; any forbidden node anywhere = reject.
+    # Defends against complex nesting like `WITH x AS (DELETE ...) SELECT ...`
     for node in tree.walk():
-        # `walk` yields tuples in some sqlglot versions; normalise to the node.
         candidate = node[0] if isinstance(node, tuple) else node
         if isinstance(candidate, FORBIDDEN_NODE_TYPES):
             raise UnsafeSQLError(

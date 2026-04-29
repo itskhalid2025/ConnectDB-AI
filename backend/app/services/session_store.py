@@ -1,3 +1,13 @@
+"""
+File: session_store.py
+Version: 1.1.0
+Created At: 2026-04-25
+Updated At: 2026-04-29
+Description: In-memory session management service. Stores active database connection 
+             pools and chat state. Implements TTL-based eviction to prevent connection 
+             leaks and ensure memory efficiency.
+"""
+
 import asyncio
 import logging
 import uuid
@@ -14,17 +24,22 @@ from app.schemas.connection import SchemaSummary
 if TYPE_CHECKING:
     import asyncpg
 
+# Initialize logger
 log = logging.getLogger(__name__)
 
 
 @dataclass
 class Session:
-    """Per-user session: connection pool + introspected schema + business notes + chat history.
-
-    Sessions are evicted by TTL; the eviction callback closes the underlying pool so
-    we don't leak connections to the user's database.
     """
-
+    Represents an active user session with a specific database.
+    
+    Attributes:
+        id: Unique hexadecimal session identifier.
+        pool: The dedicated asyncpg connection pool for this database.
+        schema: The cached results of database introspection.
+        notes: User-provided business context for SQL generation.
+        history: Bounded chat history for conversational context.
+    """
     id: str
     pool: "asyncpg.Pool"
     schema: SchemaSummary
@@ -33,24 +48,42 @@ class Session:
 
 
 class SessionStore:
+    """
+    Thread-safe storage for user sessions.
+    Uses an LRU/TTL cache to automatically manage session expiration.
+    """
     def __init__(self) -> None:
         settings = get_settings()
-        # maxsize is generous; TTL is what actually bounds memory in practice.
+        # maxsize is a safety cap; TTL is the primary cleanup driver.
         self._cache: TTLCache[str, Session] = TTLCache(
             maxsize=1024, ttl=settings.session_ttl_seconds
         )
-        # Tracks pools we've handed out so that we can close them on eviction
-        # even though TTLCache itself has no eviction-callback hook.
         self._lock = asyncio.Lock()
 
     async def create(self, pool: "asyncpg.Pool", schema: SchemaSummary) -> Session:
+        """
+        Initializes a new session and stores it in the cache.
+        
+        Args:
+            pool: The initialized asyncpg pool.
+            schema: The results of the schema inspector.
+            
+        Returns:
+            The newly created Session object.
+        """
         async with self._lock:
-            self._sweep()
+            self._sweep() # Remove expired sessions before creating new ones
             session = Session(id=uuid.uuid4().hex, pool=pool, schema=schema)
             self._cache[session.id] = session
             return session
 
     def get(self, session_id: str) -> Session:
+        """
+        Retrieves an active session by ID.
+        
+        Raises:
+            SessionNotFound: If the session has expired or never existed.
+        """
         try:
             return self._cache[session_id]
         except KeyError as exc:
@@ -60,12 +93,14 @@ class SessionStore:
             ) from exc
 
     async def delete(self, session_id: str) -> None:
+        """Explicitly terminates a session and closes its connection pool."""
         async with self._lock:
             session = self._cache.pop(session_id, None)
             if session is not None:
                 await self._close_pool(session)
 
     async def shutdown(self) -> None:
+        """Closes all active connection pools on application shutdown."""
         async with self._lock:
             sessions = list(self._cache.values())
             self._cache.clear()
@@ -74,15 +109,16 @@ class SessionStore:
 
     @staticmethod
     async def _close_pool(session: Session) -> None:
+        """Best-effort closure of the asyncpg pool."""
         try:
             await session.pool.close()
-        except Exception as e:  # pragma: no cover — best-effort cleanup
+        except Exception as e:
             log.warning("Failed to close pool for session %s: %s", session.id, e)
 
     def _sweep(self) -> None:
-        # TTLCache lazily expires on access; an explicit expire() drops stale
-        # sessions so we can close their pools deterministically next call.
+        """Triggers the expiration of stale items in the cache."""
         self._cache.expire()
 
 
+# Singleton instance
 session_store = SessionStore()

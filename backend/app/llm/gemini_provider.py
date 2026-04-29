@@ -1,19 +1,37 @@
+"""
+File: gemini_provider.py
+Version: 1.1.0
+Created At: 2026-04-25
+Updated At: 2026-04-29
+Description: Google Gemini LLM provider implementation. Handles communication with Google's 
+             Generative AI API, including history conversion and system instruction fallback logic.
+"""
+
 from __future__ import annotations
 
 import asyncio
-
+import logging
 import google.generativeai as genai
 
 from app.core.errors import LLMProviderError
 from app.llm.base import ChatMessage, LLMProvider
 from app.schemas.llm import ModelInfo
 
-
-import logging
+# Initialize logger
 log = logging.getLogger(__name__)
 
+
 def _to_gemini_history(messages: list[ChatMessage]) -> tuple[str, list[dict]]:
-    """Gemini takes system instruction separately and uses (user, model) roles."""
+    """
+    Translates standard ChatMessage objects into the format expected by Google's API.
+    Gemini takes 'system_instruction' separately and uses ('user', 'model') roles for history.
+    
+    Args:
+        messages: List of ChatMessage objects.
+        
+    Returns:
+        A tuple of (concatenated_system_instructions, list_of_chat_history_dicts).
+    """
     system_parts: list[str] = []
     chat_history: list[dict] = []
     for m in messages:
@@ -27,15 +45,25 @@ def _to_gemini_history(messages: list[ChatMessage]) -> tuple[str, list[dict]]:
 
 
 class GeminiProvider(LLMProvider):
+    """
+    Provider class for Google Gemini models.
+    """
     name = "gemini"
 
     def __init__(self, api_key: str):
+        """Initialize the Google GenerativeAI client with the provided API key."""
         super().__init__(api_key)
         genai.configure(api_key=api_key)
 
     async def list_models(self) -> list[ModelInfo]:
+        """
+        Fetch available models from the Google API that support content generation.
+        
+        Returns:
+            List of ModelInfo objects containing model IDs and labels.
+        """
         try:
-            # google-generativeai's list_models is sync; offload it.
+            # list_models is a blocking call; offload to a background thread.
             raw = await asyncio.to_thread(lambda: list(genai.list_models()))
         except Exception as e:
             raise LLMProviderError(f"Gemini: {e}", hint="Check your API key.") from e
@@ -44,7 +72,6 @@ class GeminiProvider(LLMProvider):
         for m in raw:
             if "generateContent" not in (m.supported_generation_methods or []):
                 continue
-            # Names look like 'models/gemini-1.5-pro'; the API takes either form.
             mid = m.name.replace("models/", "")
             label = m.display_name or mid
             models.append(ModelInfo(id=mid, label=label))
@@ -59,9 +86,15 @@ class GeminiProvider(LLMProvider):
         max_tokens: int = 1024,
         temperature: float = 0.0,
     ) -> str:
+        """
+        Send a chat completion request to Gemini.
+        
+        This method includes specialized logging and a fallback mechanism for models 
+        (like Gemma) that do not support 'system_instruction'.
+        """
         system_instruction, history = _to_gemini_history(messages)
         
-        # Log the outgoing prompt (without API keys)
+        # Log outgoing prompt metadata for debugging
         log.info("Gemini Request [Model: %s]", model)
         if system_instruction:
             log.info("System Instruction: %s", system_instruction)
@@ -69,12 +102,14 @@ class GeminiProvider(LLMProvider):
              log.info("Message %d [%s]: %s", i, h["role"], h["parts"][0])
 
         async def _call(sys_instr: str | None, hist: list[dict]) -> str:
+            """Internal wrapper to execute the Gemini API call."""
             client = genai.GenerativeModel(
                 model_name=model,
                 system_instruction=sys_instr,
             )
             if not hist:
                 raise LLMProviderError("No user message to send.", hint="Internal error.")
+            
             last = hist[-1]
             chat = client.start_chat(history=hist[:-1])
             resp = await asyncio.to_thread(
@@ -90,12 +125,12 @@ class GeminiProvider(LLMProvider):
         try:
             output = await _call(system_instruction or None, history)
         except Exception as e:
-            # Gemma and some other models don't support system_instruction.
-            # If we see that specific error, retry by prepending system instruction to the first user message.
+            # Handle models lacking 'system_instruction' support (e.g., Gemma)
             err_msg = str(e).lower()
             if "developer instruction is not enabled" in err_msg and system_instruction:
                 log.warning("Model does not support system instructions; retrying with prepended prompt.")
-                # Prepend system instruction to the very first user message in history
+                
+                # Logic: Prepend system instructions to the first available user message
                 new_history = history.copy()
                 if new_history and new_history[0]["role"] == "user":
                     new_history[0] = {
@@ -112,5 +147,6 @@ class GeminiProvider(LLMProvider):
             else:
                 raise LLMProviderError(f"Gemini: {e}", hint="Check the API key and selected model.") from e
 
+        # Log final output
         log.info("Gemini Response: %s", output)
         return output
