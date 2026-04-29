@@ -89,6 +89,10 @@ export interface ChatResponse {
   chart: ChartSpec | null;
   insights: string | null;
   error: ErrorPayload | null;
+  // --- New Fields for v2.0.0 ---
+  classification: string | null;
+  explanation: string | null;
+  needs_clarification: boolean;
 }
 
 /** Roles permitted in the chat history. */

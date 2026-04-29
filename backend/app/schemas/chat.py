@@ -52,6 +52,11 @@ class ChatResponse(BaseModel):
     chart: ChartSpec | None = None
     insights: str | None = None
     error: ErrorPayload | None = None
+    
+    # --- New Fields for v2.0.0 Pipeline ---
+    classification: str | None = None
+    explanation: str | None = None
+    needs_clarification: bool = False
 
 
 class ChatTurn(BaseModel):

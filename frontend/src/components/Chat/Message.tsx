@@ -83,12 +83,21 @@ export function Message({ message }: Props) {
         ) : (
           /* Successful Insight View */
           <>
-            {/* 1. Natural Language Insights */}
+            {/* 1. Natural Language Insights / Clarification */}
             {message.payload?.insights && (
-              <div className="bg-muted/10 border border-border/30 rounded-2xl rounded-tl-none px-6 py-4 text-sm text-foreground/90 whitespace-pre-wrap leading-relaxed backdrop-blur-md shadow-xl relative overflow-hidden group">
+              <div className={`bg-muted/10 border border-border/30 rounded-2xl rounded-tl-none px-6 py-4 text-sm text-foreground/90 whitespace-pre-wrap leading-relaxed backdrop-blur-md shadow-xl relative overflow-hidden group ${message.payload.needs_clarification ? 'border-amber-500/30 bg-amber-500/5' : ''}`}>
                 <div className="absolute top-0 right-0 p-3 opacity-10 group-hover:opacity-30 transition-opacity">
-                   <Sparkles className="w-4 h-4 text-primary" />
+                   {message.payload.needs_clarification ? (
+                     <AlertTriangle className="w-4 h-4 text-amber-500" />
+                   ) : (
+                     <Sparkles className="w-4 h-4 text-primary" />
+                   )}
                 </div>
+                {message.payload.needs_clarification && (
+                  <p className="text-[10px] font-bold text-amber-500 uppercase tracking-widest mb-2 flex items-center gap-1.5">
+                    Ambiguity Detected
+                  </p>
+                )}
                 {message.payload.insights}
               </div>
             )}

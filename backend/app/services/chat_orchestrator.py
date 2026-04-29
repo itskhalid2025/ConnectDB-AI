@@ -1,41 +1,37 @@
 """
 File: chat_orchestrator.py
-Version: 1.1.0
+Version: 2.0.0
 Created At: 2026-04-25
 Updated At: 2026-04-29
-Description: Core orchestration service that manages the end-to-end flow of natural language 
-             to SQL generation, safety validation, database execution, and analytical insight synthesis.
+Description: Enhanced orchestration service implementing a 6-stage AI pipeline.
+             Includes classification, self-healing SQL generation, and ambiguity gates.
 """
 
 from __future__ import annotations
-
 import logging
 import uuid
 import json
 
 from app.core.config import get_settings
-from app.core.errors import ConnectDBError, UnsafeSQLError
+from app.core.errors import ConnectDBError, SQLExecutionError
 from app.llm.factory import get_provider
 from app.llm.prompts import (
-    build_insight_messages, 
     build_sql_messages,
-    build_chart_intelligence_messages
+    build_insight_messages,
+    build_chart_intelligence_messages,
+    build_recovery_messages,
+    build_clarify_messages
 )
 from app.schemas.chat import ChatResponse, ChatTurn, ErrorPayload
-from app.llm.base import ChatMessage
 from app.schemas.llm import AIConfig
 from app.services.analyzer import build_chart
-from app.services.schema_inspector import render_schema_for_prompt
+from app.services.query_classifier import classify_query
+from app.services.schema_builder import build_schema_context
 from app.services.session_store import Session
 from app.services.sql_executor import execute as execute_sql
 from app.services.sql_guard import validate as validate_sql
 
-# Initialize logger for orchestration events
 log = logging.getLogger(__name__)
-
-# Token used by the LLM to signal it cannot satisfy a query with the current schema
-CANNOT_ANSWER_MARKER = "-- cannot answer"
-
 
 async def handle_message(
     session: Session,
@@ -44,133 +40,123 @@ async def handle_message(
     ai_config: AIConfig,
 ) -> ChatResponse:
     """
-    Main orchestration entry point for a single chat turn.
-    
-    Workflow:
-    1. Generate raw SQL using the configured LLM provider.
-    2. Validate SQL for safety and read-only constraints.
-    3. Execute SQL against the target database.
-    4. Heuristically select a chart and generate analytical insights.
-    5. Maintain session history for multi-turn conversations.
-    
-    Args:
-        session: Current user session object containing DB pool and schema.
-        question: The natural language question from the user.
-        ai_config: Configuration for the LLM (provider, model, API key).
-        
-    Returns:
-        ChatResponse object containing SQL, data, chart, and insights.
+    Enhanced Orchestration Pipeline (v2.0.0):
+    1. Classify Intent & Check Clarity
+    2. Ambiguity Gate (Stage 6)
+    3. Generate SQL (Stage 2)
+    4. Execute & Self-Heal (Stage 5)
+    5. Chart Intelligence (Stage 3)
+    6. Insight Synthesis (Stage 4)
     """
     settings = get_settings()
     message_id = uuid.uuid4().hex
     provider = get_provider(ai_config.provider, ai_config.api_key)
+    schema_text = build_schema_context(session.schema)
     
-    # Calculate history window for context
-    history_window = session.history[-settings.chat_history_turns * 2 :]
-
-    # --- Step 1: SQL Generation ---
-    try:
-        sql_messages = build_sql_messages(
-            question=question,
-            schema_text=render_schema_for_prompt(session.schema),
-            business_notes=session.notes,
-            history=history_window,
+    # --- Stage 1: Classification & Stage 6: Ambiguity Gate ---
+    classification = await classify_query(
+        provider, ai_config.model, question, schema_text
+    )
+    
+    if classification["clarity_score"] < 0.7:
+        clarification = await provider.chat(
+            model=ai_config.model,
+            messages=build_clarify_messages(question, schema_text, classification["reason"]),
+            max_tokens=300
         )
+        return ChatResponse(
+            message_id=message_id,
+            insights=clarification,
+            needs_clarification=True,
+            classification=classification["strategy"]
+        )
+
+    # --- Stage 2: SQL Generation ---
+    history_window = session.history[-settings.chat_history_turns * 2 :]
+    sql_messages = build_sql_messages(
+        question=question,
+        schema_text=schema_text,
+        strategy=classification["strategy"],
+        business_notes=session.notes,
+        history=history_window
+    )
+    
+    try:
         raw_sql = await provider.chat(
             model=ai_config.model,
             messages=sql_messages,
             max_tokens=800,
-            temperature=0.0, # Zero temperature for deterministic SQL
+            temperature=0.0
         )
     except ConnectDBError as e:
         return _error_response(message_id, e)
 
-    # Handle explicit "cannot answer" case
-    if CANNOT_ANSWER_MARKER in raw_sql.lower():
-        msg = "I don't have enough schema information to answer that."
-        session.history.append(ChatTurn(role="user", content=question))
-        session.history.append(ChatTurn(role="assistant", content=msg))
-        return ChatResponse(message_id=message_id, insights=msg)
+    if "-- cannot answer" in raw_sql.lower():
+        return ChatResponse(message_id=message_id, insights="I couldn't find a way to answer that with the current schema.")
 
-    # --- Step 2: Safety & Intent Validation ---
-    # Determine if the response is SQL or a conversational greeting
-    is_sql = "select" in raw_sql.lower() or "with" in raw_sql.lower()
-    
-    if not is_sql:
-        # Treatment for direct text responses (Greetings, capability questions)
-        clean_msg = raw_sql.strip()
-        if clean_msg.startswith("--"):
-            clean_msg = clean_msg.lstrip("-").strip()
-            
-        session.history.append(ChatTurn(role="user", content=question))
-        session.history.append(ChatTurn(role="assistant", content=clean_msg))
-        return ChatResponse(message_id=message_id, insights=clean_msg)
+    # --- Stage 4 & 5: Execution & Self-Healing ---
+    safe_sql = ""
+    table = None
+    retry_count = 0
+    max_retries = 1
+    current_sql = raw_sql
 
-    try:
-        # Guard against destructive or non-performant queries
-        safe_sql = validate_sql(raw_sql, max_rows=settings.max_result_rows)
-    except UnsafeSQLError as e:
-        return _error_response(message_id, e, sql=raw_sql)
+    while retry_count <= max_retries:
+        try:
+            safe_sql = validate_sql(current_sql, max_rows=settings.max_result_rows)
+            table = await execute_sql(
+                session.pool,
+                safe_sql,
+                timeout_seconds=settings.query_timeout_seconds,
+                max_rows=settings.max_result_rows
+            )
+            break # Success
+        except (SQLExecutionError) as e:
+            if retry_count < max_retries:
+                log.warning("SQL failed, attempting self-healing retry. Error: %s", e)
+                recovery_msgs = build_recovery_messages(question, schema_text, current_sql, str(e))
+                current_sql = await provider.chat(model=ai_config.model, messages=recovery_msgs)
+                retry_count += 1
+            else:
+                return _error_response(message_id, e, sql=current_sql)
+        except Exception as e:
+             return _error_response(message_id, ConnectDBError(str(e), stage="orchestrator"), sql=current_sql)
 
-    # --- Step 3: Database Execution ---
-    try:
-        table = await execute_sql(
-            session.pool,
-            safe_sql,
-            timeout_seconds=settings.query_timeout_seconds,
-            max_rows=settings.max_result_rows,
-        )
-    except ConnectDBError as e:
-        return _error_response(message_id, e, sql=safe_sql)
-
-    # --- Step 4: Analytical Synthesis ---
-    # Intelligent Chart Selection: Rate the need for a chart (0-10)
+    # --- Stage 3: Chart Intelligence ---
     chart = None
     try:
-        chart_intel_messages = build_chart_intelligence_messages(question=question, table=table)
         intel_raw = await provider.chat(
             model=ai_config.model,
-            messages=chart_intel_messages,
+            messages=build_chart_intelligence_messages(question, table),
             max_tokens=200,
-            temperature=0.0,
+            temperature=0.0
         )
-        # Handle potential markdown backticks in LLM response
+        # Parse JSON
         clean_intel = intel_raw.strip()
         if clean_intel.startswith("```"):
             clean_intel = clean_intel.split("```")[1]
             if clean_intel.startswith("json"):
                 clean_intel = clean_intel[4:].strip()
-        
         intel = json.loads(clean_intel)
-        log.info("Chart Intelligence: Score=%s, Type=%s, Reason=%s", 
-                 intel.get("score"), intel.get("chart_type"), intel.get("reason"))
         
         if intel.get("score", 0) >= 7:
-            chart = build_chart(
-                table, 
-                question=question, 
-                preferred_type=intel.get("chart_type")
-            )
+            chart = build_chart(table, question=question, preferred_type=intel.get("chart_type"))
     except Exception as e:
-        log.warning("Chart Intelligence failed, falling back to heuristics: %s", e)
+        log.warning("Chart intel failed: %s", e)
         chart = build_chart(table, question=question)
 
-    insight = ""
+    # --- Stage 4: Insight Synthesis ---
     try:
-        # Summarize the data in plain English (Senior Data Engineer tone)
-        insight_messages = build_insight_messages(question=question, table=table)
         insight = await provider.chat(
             model=ai_config.model,
-            messages=insight_messages,
-            max_tokens=300,
-            temperature=0.2, # Slight temperature for natural phrasing
+            messages=build_insight_messages(question, table),
+            max_tokens=400,
+            temperature=0.2
         )
-    except ConnectDBError as e:
-        log.warning("Insight generation failed: %s", e)
-        insight = "Results are shown below."
+    except Exception:
+        insight = "Analysis complete. See data below."
 
-    # --- Step 5: Session State Management ---
-    # Persist the turn to history for future context
+    # Update history
     session.history.append(ChatTurn(role="user", content=question))
     session.history.append(ChatTurn(role="assistant", content=insight))
 
@@ -180,6 +166,14 @@ async def handle_message(
         table=table,
         chart=chart,
         insights=insight,
+        classification=classification["strategy"]
+    )
+
+def _error_response(message_id: str, exc: ConnectDBError, sql: str | None = None) -> ChatResponse:
+    return ChatResponse(
+        message_id=message_id,
+        sql=sql,
+        error=ErrorPayload(stage=exc.stage, message=str(exc), hint=getattr(exc, "hint", ""))
     )
 
 
