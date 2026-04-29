@@ -11,11 +11,16 @@ from __future__ import annotations
 
 import logging
 import uuid
+import json
 
 from app.core.config import get_settings
 from app.core.errors import ConnectDBError, UnsafeSQLError
 from app.llm.factory import get_provider
-from app.llm.prompts import build_insight_messages, build_sql_messages
+from app.llm.prompts import (
+    build_insight_messages, 
+    build_sql_messages,
+    build_chart_intelligence_messages
+)
 from app.schemas.chat import ChatResponse, ChatTurn, ErrorPayload
 from app.llm.base import ChatMessage
 from app.schemas.llm import AIConfig
@@ -119,8 +124,37 @@ async def handle_message(
         return _error_response(message_id, e, sql=safe_sql)
 
     # --- Step 4: Analytical Synthesis ---
-    # Choose a chart spec based on the data shape and user intent
-    chart = build_chart(table, question=question)
+    # Intelligent Chart Selection: Rate the need for a chart (0-10)
+    chart = None
+    try:
+        chart_intel_messages = build_chart_intelligence_messages(question=question, table=table)
+        intel_raw = await provider.chat(
+            model=ai_config.model,
+            messages=chart_intel_messages,
+            max_tokens=200,
+            temperature=0.0,
+        )
+        # Handle potential markdown backticks in LLM response
+        clean_intel = intel_raw.strip()
+        if clean_intel.startswith("```"):
+            clean_intel = clean_intel.split("```")[1]
+            if clean_intel.startswith("json"):
+                clean_intel = clean_intel[4:].strip()
+        
+        intel = json.loads(clean_intel)
+        log.info("Chart Intelligence: Score=%s, Type=%s, Reason=%s", 
+                 intel.get("score"), intel.get("chart_type"), intel.get("reason"))
+        
+        if intel.get("score", 0) >= 7:
+            chart = build_chart(
+                table, 
+                question=question, 
+                preferred_type=intel.get("chart_type")
+            )
+    except Exception as e:
+        log.warning("Chart Intelligence failed, falling back to heuristics: %s", e)
+        chart = build_chart(table, question=question)
+
     insight = ""
     try:
         # Summarize the data in plain English (Senior Data Engineer tone)

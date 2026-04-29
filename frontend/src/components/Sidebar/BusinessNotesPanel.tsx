@@ -56,18 +56,19 @@ export function BusinessNotesPanel() {
     <Card title="Knowledge Base (Context)">
       <div className="space-y-3">
         <p className="text-[10px] text-muted-foreground leading-relaxed">
+          Add any context about the database, tables, schema, or specific columns. 
           Define metrics (e.g. <code className="text-primary/70">churn</code>) 
-          or logic specific to your database to help the AI generate accurate SQL.
+          or logic to help the AI generate accurate SQL.
         </p>
         <textarea
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           onBlur={handleSave}
           disabled={!sessionId}
-          rows={6}
+          rows={8}
           placeholder={
             sessionId
-              ? 'e.g. "High value customer" = total_spend > 5000\n"Internal users" have @company.com emails.'
+              ? 'e.g.\n"The users table contains our primary customers."\n"The status column in invoices: 1=Paid, 0=Pending."\n"Revenue" = sum of amount where type is "sale".'
               : 'Establish a database connection to begin adding context…'
           }
           className="w-full bg-black/20 border border-border/50 rounded-lg px-3 py-2 text-xs text-foreground/90 resize-none focus:ring-1 focus:ring-primary/30 focus:border-primary/50 transition-all placeholder:text-muted-foreground/30 disabled:opacity-30 font-sans"

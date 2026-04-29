@@ -58,7 +58,12 @@ def _column(rows: list[list[Any]], idx: int) -> list[Any]:
     return [r[idx] for r in rows]
 
 
-def build_chart(table: TableResult, *, question: str = "") -> ChartSpec | None:
+def build_chart(
+    table: TableResult, 
+    *, 
+    question: str = "", 
+    preferred_type: str | None = None
+) -> ChartSpec | None:
     """
     Primary entry point: Selects and builds a Plotly chart spec based on the result shape.
     
@@ -71,17 +76,32 @@ def build_chart(table: TableResult, *, question: str = "") -> ChartSpec | None:
     Args:
         table: The execution result containing columns and rows.
         question: Original user NL question (used to detect preferred chart types).
+        preferred_type: Explicit chart type requested by an intelligence layer.
     """
     if not table.columns or not table.rows:
         return None
 
     n_cols = len(table.columns)
-    if n_cols < 2:
-        return None
-
     kinds = [_column_kind(table.rows, i) for i in range(n_cols)]
     q_lower = question.lower()
     
+    # Explicit Override from Intelligence Layer
+    if preferred_type == "indicator" and kinds[0] == "number":
+        return _indicator(table, val_idx=0)
+    if preferred_type == "pie" and n_cols >= 2:
+        return _pie(table, label_idx=0, value_idx=1)
+    if preferred_type == "bar" and n_cols >= 2:
+        return _bar(table, x_idx=0, y_idx=1)
+    if preferred_type == "line" and n_cols >= 2:
+        return _line(table, x_idx=0, y_indices=[1])
+    
+    # Implicit Heuristics
+    if n_cols == 1 and kinds[0] == "number":
+        return _indicator(table, val_idx=0)
+
+    if n_cols < 2:
+        return None
+
     # User Intent Detection
     wants_pie = "pie" in q_lower
     wants_area = "area" in q_lower
@@ -271,5 +291,23 @@ def _scatter(table: TableResult, *, x_idx: int, y_idx: int) -> ChartSpec:
         "xaxis": {"title": table.columns[x_idx]},
         "yaxis": {"title": table.columns[y_idx]},
         "margin": {"l": 50, "r": 20, "t": 20, "b": 50},
+    }
+    return ChartSpec(data=data, layout=layout)
+
+
+def _indicator(table: TableResult, *, val_idx: int) -> ChartSpec:
+    """Build a Plotly Indicator (Big Number) spec."""
+    val = table.rows[0][val_idx] if table.rows else 0
+    data = [
+        {
+            "type": "indicator",
+            "mode": "number",
+            "value": val,
+            "title": {"text": table.columns[val_idx]},
+            "number": {"font": {"size": 80, "color": "#2563eb"}},
+        }
+    ]
+    layout = {
+        "margin": {"l": 20, "r": 20, "t": 20, "b": 20},
     }
     return ChartSpec(data=data, layout=layout)
