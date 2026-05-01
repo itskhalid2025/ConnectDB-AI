@@ -22,7 +22,7 @@ next-env.d.ts
 .env.local
 .env.*.local
 *.local
-
+apiky.md
 # Editor / OS
 .vscode/
 .idea/

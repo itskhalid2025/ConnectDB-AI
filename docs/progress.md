@@ -93,3 +93,24 @@ Each entry is appended when a milestone is completed.
 - Multi-database support (MySQL, SQLite, BigQuery)
 - Persistent sessions via Redis
 - Authentication (NextAuth.js)
+
+---
+
+## 2026-05-02 — Type Alignment and Documentation
+
+**Session goal:** Resolve TypeScript type safety issues and provide comprehensive system documentation.
+
+### Fixes & Improvements
+
+| Area | Description |
+|---|---|
+| `frontend/src/components/Chat/ChatInput.tsx` | Fixed type mismatch by updating fallback payload to include `classification`, `explanation`, and `needs_clarification`. |
+| `frontend/.eslintrc.json` | Added ESLint configuration for consistent linting. |
+| `docs/instruction.md` | Created comprehensive system setup and running instructions. |
+
+### Tasks Completed
+
+- [x] Align frontend `ChatResponse` fallback with backend v2.0.0 schema.
+- [x] Verify frontend type safety via ESLint.
+- [x] Document system prerequisites and run instructions.
+- [x] Document recent major work in instruction log.
