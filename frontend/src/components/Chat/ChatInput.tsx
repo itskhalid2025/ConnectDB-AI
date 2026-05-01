@@ -1,11 +1,13 @@
 /**
  * File: ChatInput.tsx
- * Version: 1.1.0
+ * Version: 1.1.1
  * Created At: 2026-04-25
- * Updated At: 2026-04-29
+ * Updated At: 2026-05-02
  * Description: Primary input component for the analytical conversational interface.
  *              Manages input state, multi-line growth, and orchestrates the 
  *              message submission cycle with local state synchronization.
+ * Changes:
+ * - 1.1.1: Updated error fallback payload to match ChatResponse v2.0.0 schema.
  */
 
 'use client';
@@ -85,6 +87,9 @@ export function ChatInput() {
           chart: null,
           insights: null,
           error: { stage: 'request', message: 'Engine Timeout', hint },
+          classification: null,
+          explanation: null,
+          needs_clarification: false,
         },
       });
     } finally {
