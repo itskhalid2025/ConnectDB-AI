@@ -111,9 +111,9 @@ async def handle_message(
                 max_rows=settings.max_result_rows
             )
             break # Success
-        except (SQLExecutionError) as e:
+        except (SQLExecutionError, UnsafeSQLError) as e:
             if retry_count < max_retries:
-                log.warning("SQL failed, attempting self-healing retry. Error: %s", e)
+                log.warning("SQL failed or was invalid, attempting self-healing retry. Error: %s", e)
                 recovery_msgs = build_recovery_messages(question, schema_text, current_sql, str(e))
                 current_sql = await provider.chat(model=ai_config.model, messages=recovery_msgs)
                 retry_count += 1

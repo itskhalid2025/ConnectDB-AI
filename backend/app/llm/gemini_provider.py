@@ -112,14 +112,22 @@ class GeminiProvider(LLMProvider):
             
             last = hist[-1]
             chat = client.start_chat(history=hist[:-1])
-            resp = await asyncio.to_thread(
-                chat.send_message,
+            
+            # Avoid strict 0.0 temperature on experimental models to prevent early stops
+            safe_temp = max(0.05, temperature)
+            
+            resp = await chat.send_message_async(
                 last["parts"][0],
                 generation_config={
-                    "temperature": temperature,
+                    "temperature": safe_temp,
                     "max_output_tokens": max_tokens,
                 },
             )
+            try:
+                finish_reason = resp.candidates[0].finish_reason
+                log.info("Gemini Finish Reason: %s", finish_reason)
+            except Exception as e:
+                pass
             return (getattr(resp, "text", "") or "").strip()
 
         try:

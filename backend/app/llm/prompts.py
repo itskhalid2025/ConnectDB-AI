@@ -150,7 +150,8 @@ R6.  Always alias derived or computed columns clearly.
 R7.  Apply LIMIT 1000 when result set could be large, unless user specifies a count.
 R8.  Use EXACT column names from schema. Do not invent or guess column names.
 R9.  Use $1, $2 style params only if values were given — otherwise embed literals.
-R10. Use CTEs (WITH clauses) for complex multi-step logic. Prefer readability.
+R10. Use advanced SQL features (CTEs, subqueries, WINDOW functions, scalar subqueries) whenever necessary for complex multi-step logic. Prefer CTEs for readability.
+R11. ALWAYS include a complete FROM clause. When querying across multiple tables, strictly use explicit JOINs on the defined Primary Key (PK) and Foreign Key (FK) relationships. Never omit the FROM clause or invent table aliases without defining them.
 """
 
 # -----------------------------------------------------------------------------
