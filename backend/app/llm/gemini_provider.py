@@ -85,17 +85,15 @@ class GeminiProvider(LLMProvider):
         messages: list[ChatMessage],
         max_tokens: int = 1024,
         temperature: float = 0.0,
+        response_format: str = "text",
     ) -> str:
         """
         Send a chat completion request to Gemini.
-        
-        This method includes specialized logging and a fallback mechanism for models 
-        (like Gemma) that do not support 'system_instruction'.
         """
         system_instruction, history = _to_gemini_history(messages)
         
         # Log outgoing prompt metadata for debugging
-        log.info("Gemini Request [Model: %s]", model)
+        log.info("Gemini Request [Model: %s, Format: %s]", model, response_format)
         if system_instruction:
             log.info("System Instruction: %s", system_instruction)
         for i, h in enumerate(history):
@@ -110,17 +108,43 @@ class GeminiProvider(LLMProvider):
             if not hist:
                 raise LLMProviderError("No user message to send.", hint="Internal error.")
             
-            last = hist[-1]
-            chat = client.start_chat(history=hist[:-1])
+            # Use generate_content for better stability in stateless pipeline calls
+            # Configure safety settings to be less restrictive for SQL/Technical tasks
+            # This prevents truncation of code-like snippets.
+            safety_settings = [
+                {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
+                {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
+                {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
+                {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"},
+            ]
+
+            generation_config = {
+                "temperature": temperature,
+                "max_output_tokens": max_tokens,
+            }
+
+            if response_format == "json":
+                generation_config["response_mime_type"] = "application/json"
+
+            # Gemini expects the last message as part of the content list
             resp = await asyncio.to_thread(
-                chat.send_message,
-                last["parts"][0],
-                generation_config={
-                    "temperature": temperature,
-                    "max_output_tokens": max_tokens,
-                },
+                client.generate_content,
+                hist,
+                generation_config=generation_config,
+                safety_settings=safety_settings,
             )
-            return (getattr(resp, "text", "") or "").strip()
+            
+            # Check for block/truncation
+            if not resp or not resp.candidates:
+                log.error("Gemini blocked response: %s", resp.prompt_feedback if hasattr(resp, "prompt_feedback") else "No candidates")
+                raise LLMProviderError("Gemini blocked or returned empty response.")
+            
+            if resp.candidates[0].finish_reason == 2: # SAFETY
+                log.warning("Gemini response truncated due to SAFETY")
+            elif resp.candidates[0].finish_reason == 3: # RECITATION
+                log.warning("Gemini response truncated due to RECITATION")
+
+            return (resp.text or "").strip()
 
         try:
             output = await _call(system_instruction or None, history)
@@ -130,7 +154,6 @@ class GeminiProvider(LLMProvider):
             if "developer instruction is not enabled" in err_msg and system_instruction:
                 log.warning("Model does not support system instructions; retrying with prepended prompt.")
                 
-                # Logic: Prepend system instructions to the first available user message
                 new_history = history.copy()
                 if new_history and new_history[0]["role"] == "user":
                     new_history[0] = {
@@ -145,8 +168,8 @@ class GeminiProvider(LLMProvider):
                 except Exception as inner_e:
                     raise LLMProviderError(f"Gemini (Retry): {inner_e}") from inner_e
             else:
-                raise LLMProviderError(f"Gemini: {e}", hint="Check the API key and selected model.") from e
+                raise LLMProviderError(f"Gemini: {e}") from e
 
-        # Log final output
-        log.info("Gemini Response: %s", output)
+        # Log final output (truncated for readability)
+        log.info("Gemini Response: %s", output[:500] + "..." if len(output) > 500 else output)
         return output

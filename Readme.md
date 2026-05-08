@@ -30,19 +30,48 @@ Every answer includes the generated SQL in a collapsible block.
 
 ---
 
-## Prerequisites
+## Setup & Installation
 
-| Tool | Min version | How to check |
-|---|---|---|
-| Python | 3.11 | python --version |
-| Node.js | 18 | node --version |
-| npm | 9 | npm --version |
+### 🚀 Quick Start (Windows - Recommended)
+If you are on Windows, you can start the entire system by simply running these two files from the project root:
 
-You also need an API key from one of: OpenAI, Google Gemini, or Anthropic Claude.
+1.  **Double-click `start-back.bat`** (Starts the Python backend + installs dependencies)
+2.  **Double-click `start-front.bat`** (Starts the Next.js frontend + installs dependencies)
+
+Once both terminals show "Ready", open **[http://localhost:3000](http://localhost:3000)** in your browser.
 
 ---
 
-## Quick start
+### 🛠️ Manual Setup & Installation
+You will need to open two separate terminal windows to run the application.
+
+### Terminal 1 — Backend
+**Windows (PowerShell):**
+```powershell
+.\start-back.ps1
+```
+
+**Linux / Mac / Git Bash:**
+```bash
+bash start-back.sh
+```
+
+### Terminal 2 — Frontend
+**Windows (PowerShell):**
+```powershell
+.\start-front.ps1
+```
+
+**Linux / Mac / Git Bash:**
+```bash
+bash start-front.sh
+```
+
+Open [http://localhost:3000](http://localhost:3000) in your browser.
+
+---
+
+## Prerequisites (Manual Setup Only)
 
 Open two separate terminal windows.
 
@@ -94,6 +123,7 @@ Fill in the PostgreSQL connection panel in the left sidebar:
 | Database | myapp_db |
 | User | postgres |
 | Password | your password |
+| Target Schemas (Optional) | public, tenant_abc |
 
 Click Test to verify the credentials without starting a session.
 Click Connect to connect. The sidebar shows your tables once connected.
@@ -191,12 +221,12 @@ Interactive docs: http://localhost:8000/docs (Swagger UI, available while backen
 | Method | Endpoint | Purpose |
 |---|---|---|
 | POST | /api/connections/test | Test credentials without creating a session |
-| POST | /api/connections/connect | Connect + inspect schema, returns session_id |
+| POST | /api/connections/connect | Connect + inspect schema, returns session_id (supports optional `schemas` array) |
 | GET | /api/sessions/{id}/schema | Get introspected schema for a session |
 | PUT | /api/sessions/{id}/notes | Save business notes |
 | DELETE | /api/sessions/{id} | Close session and release pool |
 | GET | /api/llm/models | List models (?provider=openai&api_key=...) |
-| POST | /api/chat/{id}/message | Send question, get SQL+table+chart+insight |
+| POST | /api/chat/{id}/message | Send question, get SQL+table+chart+insight+classification |
 | GET | /health | Health check |
 
 ---

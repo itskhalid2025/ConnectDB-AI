@@ -14,6 +14,7 @@ import sqlglot
 from sqlglot import exp
 
 from app.core.errors import UnsafeSQLError
+from app.utils.llm_utils import clean_sql
 
 # --- Configuration: Forbidden Operations ---
 # Anything that mutates state, alters schema, manages users, or escapes the SQL
@@ -46,18 +47,7 @@ _FORBIDDEN_KEYWORDS_RE = re.compile(
 )
 
 
-def _strip_fences(sql: str) -> str:
-    """
-    LLMs sometimes wrap SQL in markdown fences (```sql) despite instructions. 
-    This utility cleans the raw output.
-    """
-    s = sql.strip()
-    if s.startswith("```"):
-        # remove first fence line
-        s = s.split("\n", 1)[1] if "\n" in s else s.lstrip("`")
-        if s.endswith("```"):
-            s = s[: -3]
-    return s.strip().rstrip(";").strip()
+
 
 
 def _has_limit(node: exp.Expression) -> bool:
@@ -102,7 +92,7 @@ def validate(sql: str, *, max_rows: int) -> str:
     if not sql or not sql.strip():
         raise UnsafeSQLError("Empty SQL.", hint="The model didn't return a query — try rephrasing.")
 
-    cleaned = _strip_fences(sql)
+    cleaned = clean_sql(sql)
 
     # Coarse keyword scan first — fast and catches obvious stuff before parsing.
     if _FORBIDDEN_KEYWORDS_RE.search(cleaned):

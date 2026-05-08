@@ -61,7 +61,7 @@ async def connect(creds: PostgresCredentials) -> ConnectResponse:
     """
     pool = await pg_connector.create_pool(creds)
     try:
-        schema = await schema_inspector.introspect(pool)
+        schema = await schema_inspector.introspect(pool, schemas=creds.schemas)
     except Exception:
         # Prevent connection leaks if introspection fails
         await pool.close()

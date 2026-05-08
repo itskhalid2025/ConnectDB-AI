@@ -139,6 +139,15 @@ export function ConnectionForm() {
             onChange={(e) => setCredentials({ password: e.target.value })}
             disabled={isConnected}
           />
+          <Input
+            label="Target Schemas"
+            placeholder="e.g. public, tenant_abc"
+            value={credentials.schemas?.join(', ') || ''}
+            onChange={(e) => setCredentials({ 
+              schemas: e.target.value ? e.target.value.split(',').map(s => s.trim()) : [] 
+            })}
+            disabled={isConnected}
+          />
         </div>
 
         {/* Feedback Messages */}

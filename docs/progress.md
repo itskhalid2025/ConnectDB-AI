@@ -114,3 +114,79 @@ Each entry is appended when a milestone is completed.
 - [x] Verify frontend type safety via ESLint.
 - [x] Document system prerequisites and run instructions.
 - [x] Document recent major work in instruction log.
+
+---
+
+## 2026-05-02 — Multi-Tenant Schema Scoping
+
+**Session goal:** Enable the system to handle large multi-tenant databases by allowing targeted schema introspection.
+
+### Features Added
+
+| Feature | Description |
+|---|---|
+| Target Schemas | New connection field to limit introspection to specific schemas (e.g., `public, tenant_001`). |
+| Schema Filtering | Backend introspection queries optimized with `ANY($1::text[])` for high-performance filtering. |
+
+### Tasks Completed
+
+- [x] Implement backend schema filtering in `schema_inspector.py`.
+- [x] Update connection credentials to support `schemas` list.
+- [x] Integrate "Target Schemas" field into the frontend `ConnectionForm`.
+- [x] Update system documentation (`Readme.md`, `instruction.md`).
+- [x] Verify filtering logic via automated scratch scripts.
+
+---
+
+## 2026-05-05 — Docker Packaging for Reusability
+
+**Session goal:** Containerize the application to make it easily installable and reusable on any system.
+
+### Features Added
+
+| Feature | Description |
+|---|---|
+| Backend Dockerization | Multi-stage build for FastAPI backend using `python:3.11-slim`. |
+| Frontend Dockerization | Production-ready Next.js build using `node:18-alpine`. |
+| Docker Compose | Unified orchestration for frontend and backend with a single command. |
+
+### Tasks Completed
+
+- [x] Create `backend/Dockerfile` and `.dockerignore`.
+- [x] Create `frontend/Dockerfile` and `.dockerignore`.
+- [x] Create root `docker-compose.yml`.
+- [x] Update `Readme.md` with Docker Quick Start instructions.
+
+---
+
+## 2026-05-05 — Docker Distribution (CANCELLED)
+
+**Session goal:** Create a single-image distribution.
+
+> [!WARNING]
+> This phase was cancelled and the configuration was removed due to Docker networking complexities on Windows. The project has been restored to its standard local development state.
+
+### Removed Features
+- Unified Dockerfile
+- GHCR Automation Workflow
+- Static Backend serving
+
+---
+
+## 2026-05-06 — Streamlined Startup & Distribution
+
+**Session goal:** Prepare the project for social media distribution (LinkedIn) by automating the onboarding process for Windows users.
+
+### Features & Fixes
+
+| Area | Description |
+|---|---|
+| `start-front.bat` | Updated to run `npm install` automatically on every launch to ensure dependency sync. |
+| `Readme.md` | Added high-visibility "🚀 Quick Start (Windows)" section at the top of the documentation. |
+| Batch Scripts | Standardized startup behavior across backend and frontend launchers. |
+
+### Tasks Completed
+
+- [x] Modify `start-front.bat` to force `npm install` on startup.
+- [x] Update `Readme.md` with explicit instructions for `.bat` file usage.
+- [x] Verify startup sequence logic in both backend and frontend batch files.

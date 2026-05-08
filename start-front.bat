@@ -9,16 +9,12 @@ echo ====================================================
 echo   ConnectDB AI - Frontend Startup
 echo ====================================================
 
-if not exist "node_modules" (
-    echo [1/3] ==^> Installing Node.js dependencies...
-    call npm install
-    if !errorlevel! neq 0 (
-        echo [ERROR] npm install failed.
-        pause
-        exit /b !errorlevel!
-    )
-) else (
-    echo [1/3] ==^> Node.js dependencies already installed.
+echo [1/3] ==^> Installing or updating Node.js dependencies...
+call npm install
+if !errorlevel! neq 0 (
+    echo [ERROR] npm install failed.
+    pause
+    exit /b !errorlevel!
 )
 
 if not exist ".env.local" (

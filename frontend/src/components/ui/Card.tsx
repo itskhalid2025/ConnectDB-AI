@@ -1,7 +1,7 @@
 import clsx from 'clsx';
 import { HTMLAttributes, ReactNode } from 'react';
 
-interface Props extends HTMLAttributes<HTMLDivElement> {
+interface Props extends Omit<HTMLAttributes<HTMLDivElement>, 'title'> {
   title?: ReactNode;
   children: ReactNode;
 }

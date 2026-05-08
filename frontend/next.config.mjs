@@ -1,4 +1,3 @@
-/** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
   // plotly.js-dist-min is browser-only; keep it out of server bundles.

@@ -13,6 +13,7 @@ from typing import TypedDict
 from app.llm.base import LLMProvider
 from app.llm.prompts import build_classifier_messages
 from app.schemas.llm import AIConfig
+from app.utils.llm_utils import extract_json
 
 log = logging.getLogger(__name__)
 
@@ -35,19 +36,13 @@ async def classify_query(
     raw_response = await provider.chat(
         model=model,
         messages=messages,
-        max_tokens=200,
-        temperature=0.0
+        max_tokens=400, # Increased to allow for reasoning
+        temperature=0.0,
+        response_format="json"
     )
     
-    # Clean JSON response
-    clean_json = raw_response.strip()
-    if clean_json.startswith("```"):
-        clean_json = clean_json.split("```")[1]
-        if clean_json.startswith("json"):
-            clean_json = clean_json[4:].strip()
-            
     try:
-        result = json.loads(clean_json)
+        result = extract_json(raw_response)
         return {
             "strategy": result.get("strategy", "general"),
             "clarity_score": float(result.get("clarity_score", 1.0)),

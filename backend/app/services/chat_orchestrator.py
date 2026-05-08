@@ -13,7 +13,7 @@ import uuid
 import json
 
 from app.core.config import get_settings
-from app.core.errors import ConnectDBError, SQLExecutionError
+from app.core.errors import ConnectDBError, SQLExecutionError, UnsafeSQLError
 from app.llm.factory import get_provider
 from app.llm.prompts import (
     build_sql_messages,
@@ -30,6 +30,7 @@ from app.services.schema_builder import build_schema_context
 from app.services.session_store import Session
 from app.services.sql_executor import execute as execute_sql
 from app.services.sql_guard import validate as validate_sql
+from app.utils.llm_utils import extract_json, clean_sql
 
 log = logging.getLogger(__name__)
 
@@ -85,9 +86,10 @@ async def handle_message(
         raw_sql = await provider.chat(
             model=ai_config.model,
             messages=sql_messages,
-            max_tokens=800,
+            max_tokens=1024, # Increased to prevent truncation
             temperature=0.0
         )
+        raw_sql = clean_sql(raw_sql)
     except ConnectDBError as e:
         return _error_response(message_id, e)
 
@@ -111,11 +113,12 @@ async def handle_message(
                 max_rows=settings.max_result_rows
             )
             break # Success
-        except (SQLExecutionError) as e:
+        except (SQLExecutionError, UnsafeSQLError) as e:
             if retry_count < max_retries:
                 log.warning("SQL failed, attempting self-healing retry. Error: %s", e)
                 recovery_msgs = build_recovery_messages(question, schema_text, current_sql, str(e))
-                current_sql = await provider.chat(model=ai_config.model, messages=recovery_msgs)
+                retry_raw = await provider.chat(model=ai_config.model, messages=recovery_msgs, max_tokens=1024)
+                current_sql = clean_sql(retry_raw)
                 retry_count += 1
             else:
                 return _error_response(message_id, e, sql=current_sql)
@@ -128,16 +131,12 @@ async def handle_message(
         intel_raw = await provider.chat(
             model=ai_config.model,
             messages=build_chart_intelligence_messages(question, table),
-            max_tokens=200,
-            temperature=0.0
+            max_tokens=400,
+            temperature=0.0,
+            response_format="json"
         )
-        # Parse JSON
-        clean_intel = intel_raw.strip()
-        if clean_intel.startswith("```"):
-            clean_intel = clean_intel.split("```")[1]
-            if clean_intel.startswith("json"):
-                clean_intel = clean_intel[4:].strip()
-        intel = json.loads(clean_intel)
+        # Parse JSON robustly
+        intel = extract_json(intel_raw)
         
         if intel.get("score", 0) >= 7:
             chart = build_chart(table, question=question, preferred_type=intel.get("chart_type"))

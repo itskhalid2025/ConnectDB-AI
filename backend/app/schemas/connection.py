@@ -18,6 +18,10 @@ class PostgresCredentials(BaseModel):
     user: str = Field(..., min_length=1, max_length=128)
     password: str = Field(default="", max_length=512)
     sslmode: str = Field(default="prefer")
+    schemas: list[str] | None = Field(
+        default=None, 
+        description="Optional list of schemas to introspect. Defaults to all non-system schemas."
+    )
 
 
 class TestConnectionResponse(BaseModel):

@@ -18,6 +18,7 @@ export interface PostgresCredentials {
   user: string;
   password: string;
   sslmode?: string;
+  schemas?: string[];
 }
 
 /** Basic metadata for a database column. */

@@ -70,6 +70,7 @@ const DEFAULT_CREDS: PostgresCredentials = {
   user: 'postgres',
   password: '',
   sslmode: 'prefer',
+  schemas: [],
 };
 
 /**

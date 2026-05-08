@@ -25,6 +25,7 @@ _TABLES_QUERY = """
 SELECT table_schema, table_name
 FROM information_schema.tables
 WHERE table_type IN ('BASE TABLE', 'VIEW')
+  AND ($1::text[] IS NULL OR table_schema = ANY($1::text[]))
   AND table_schema NOT IN ('pg_catalog', 'information_schema', 'pg_toast')
 ORDER BY table_schema, table_name
 """
@@ -33,7 +34,8 @@ ORDER BY table_schema, table_name
 _COLUMNS_QUERY = """
 SELECT table_schema, table_name, column_name, data_type, is_nullable
 FROM information_schema.columns
-WHERE table_schema NOT IN ('pg_catalog', 'information_schema', 'pg_toast')
+WHERE ($1::text[] IS NULL OR table_schema = ANY($1::text[]))
+  AND table_schema NOT IN ('pg_catalog', 'information_schema', 'pg_toast')
 ORDER BY table_schema, table_name, ordinal_position
 """
 
@@ -53,6 +55,7 @@ JOIN information_schema.constraint_column_usage ccu
     ON ccu.constraint_name = tc.constraint_name
     AND ccu.table_schema = tc.table_schema
 WHERE tc.constraint_type = 'FOREIGN KEY'
+  AND ($1::text[] IS NULL OR tc.table_schema = ANY($1::text[]))
   AND tc.table_schema NOT IN ('pg_catalog', 'information_schema', 'pg_toast')
 """
 
@@ -62,25 +65,27 @@ SELECT n.nspname AS schema, c.relname AS name, c.reltuples::bigint AS approx
 FROM pg_class c
 JOIN pg_namespace n ON n.oid = c.relnamespace
 WHERE c.relkind IN ('r', 'p')
+  AND ($1::text[] IS NULL OR n.nspname = ANY($1::text[]))
   AND n.nspname NOT IN ('pg_catalog', 'information_schema', 'pg_toast')
 """
 
 
-async def introspect(pool: asyncpg.Pool) -> SchemaSummary:
+async def introspect(pool: asyncpg.Pool, schemas: list[str] | None = None) -> SchemaSummary:
     """
     Scans the connected database and returns a structured summary.
     
     Args:
         pool: The asyncpg connection pool.
+        schemas: Optional list of schemas to filter by.
         
     Returns:
         A SchemaSummary object containing all table and relationship metadata.
     """
     async with pool.acquire() as conn:
-        tables_rows = await conn.fetch(_TABLES_QUERY)
-        cols_rows = await conn.fetch(_COLUMNS_QUERY)
-        fk_rows = await conn.fetch(_FK_QUERY)
-        rowcount_rows = await conn.fetch(_ROWCOUNT_QUERY)
+        tables_rows = await conn.fetch(_TABLES_QUERY, schemas)
+        cols_rows = await conn.fetch(_COLUMNS_QUERY, schemas)
+        fk_rows = await conn.fetch(_FK_QUERY, schemas)
+        rowcount_rows = await conn.fetch(_ROWCOUNT_QUERY, schemas)
 
     # Group columns by table
     cols_by_table: dict[tuple[str, str], list[ColumnInfo]] = {}

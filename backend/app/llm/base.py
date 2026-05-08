@@ -58,6 +58,7 @@ class LLMProvider(ABC):
         messages: list[ChatMessage],
         max_tokens: int = 1024,
         temperature: float = 0.0,
+        response_format: str = "text",
     ) -> str:
         """
         Executes a single, non-streaming chat completion request.
