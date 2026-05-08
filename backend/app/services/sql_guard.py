@@ -10,7 +10,9 @@ Description: Security layer for SQL execution. Implements a defense-in-depth str
 from __future__ import annotations
 
 import re
+# pyrefly: ignore [missing-import]
 import sqlglot
+# pyrefly: ignore [missing-import]
 from sqlglot import exp
 
 from app.core.errors import UnsafeSQLError

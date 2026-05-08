@@ -83,7 +83,7 @@ class GeminiProvider(LLMProvider):
         *,
         model: str,
         messages: list[ChatMessage],
-        max_tokens: int = 1024,
+        max_tokens: int = 1500,
         temperature: float = 0.0,
     ) -> str:
         """
@@ -120,7 +120,7 @@ class GeminiProvider(LLMProvider):
                 last["parts"][0],
                 generation_config={
                     "temperature": safe_temp,
-                    "max_output_tokens": max_tokens,
+                    # Deliberately omitting max_output_tokens due to Gemini 2.5 flash early-truncation bugs
                 },
             )
             try:

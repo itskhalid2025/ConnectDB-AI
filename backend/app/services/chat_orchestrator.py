@@ -13,7 +13,7 @@ import uuid
 import json
 
 from app.core.config import get_settings
-from app.core.errors import ConnectDBError, SQLExecutionError
+from app.core.errors import ConnectDBError, SQLExecutionError, UnsafeSQLError
 from app.llm.factory import get_provider
 from app.llm.prompts import (
     build_sql_messages,
@@ -85,7 +85,7 @@ async def handle_message(
         raw_sql = await provider.chat(
             model=ai_config.model,
             messages=sql_messages,
-            max_tokens=800,
+            max_tokens=600,
             temperature=0.0
         )
     except ConnectDBError as e:
@@ -150,8 +150,7 @@ async def handle_message(
         insight = await provider.chat(
             model=ai_config.model,
             messages=build_insight_messages(question, table),
-            max_tokens=400,
-            temperature=0.2
+            max_tokens=600,            temperature=0.2
         )
     except Exception:
         insight = "Analysis complete. See data below."
