@@ -1,11 +1,21 @@
-"""
-File: chat_orchestrator.py
-Version: 2.0.0
-Created At: 2026-04-25
-Updated At: 2026-04-29
-Description: Enhanced orchestration service implementing a 6-stage AI pipeline.
-             Includes classification, self-healing SQL generation, and ambiguity gates.
-"""
+# ================================================================
+# FILE: chat_orchestrator.py
+# PATH: backend/app/services/chat_orchestrator.py
+# ================================================================
+# DESCRIPTION:
+#   Enhanced orchestration service implementing a 6-stage AI 
+#   pipeline. Includes intent classification, self-healing SQL 
+#   generation, chart intelligence, and insight synthesis.
+#
+# CREATED: 2026-04-25 | 10:00 AM
+#
+# EDIT LOG:
+# ----------------------------------------------------------------
+# [2026-04-25 | 10:00 AM] - Initial file created.
+# [2026-04-29 | 02:30 PM] - Implemented Stage 5 (Self-healing).
+# [2026-05-09 | 12:50 PM] - Standardized file header and removed 
+#                           duplicate error helper.
+# ================================================================
 
 from __future__ import annotations
 import logging
@@ -168,13 +178,6 @@ async def handle_message(
         classification=classification["strategy"]
     )
 
-def _error_response(message_id: str, exc: ConnectDBError, sql: str | None = None) -> ChatResponse:
-    return ChatResponse(
-        message_id=message_id,
-        sql=sql,
-        error=ErrorPayload(stage=exc.stage, message=str(exc), hint=getattr(exc, "hint", ""))
-    )
-
 
 def _error_response(
     message_id: str, exc: ConnectDBError, *, sql: str | None = None
@@ -185,3 +188,4 @@ def _error_response(
         sql=sql,
         error=ErrorPayload(stage=exc.stage, message=exc.message, hint=exc.hint),
     )
+

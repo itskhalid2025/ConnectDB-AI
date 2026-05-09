@@ -1,11 +1,20 @@
 /**
- * File: sessionStore.ts
- * Version: 1.2.0
- * Created At: 2026-04-25
- * Updated At: 2026-04-29
- * Description: Global state management using Zustand with Persistence. 
- *              Centralizes session state and synchronizes it with sessionStorage 
- *              to preserve data across refreshes while clearing on tab close.
+ * ============================================================
+ * FILE: sessionStore.ts
+ * PATH: frontend/src/store/sessionStore.ts
+ * ============================================================
+ * DESCRIPTION:
+ *   Global state management using Zustand with Persistence. 
+ *   Centralizes session state and synchronizes it with 
+ *   sessionStorage to preserve data across refreshes.
+ *
+ * CREATED: 2026-04-25 | 10:00 AM
+ *
+ * EDIT LOG:
+ * ─────────────────────────────────────────────────────────────
+ * [2026-04-25 | 10:00 AM] - Initial file created.
+ * [2026-05-09 | 01:09 PM] - Standardized file header and JSDoc.
+ * ─────────────────────────────────────────────────────────────
  */
 
 import { create } from 'zustand';

@@ -1,14 +1,21 @@
 /**
- * File: ChartRenderer.tsx
- * Version: 1.1.0
- * Created At: 2026-04-25
+ * ============================================================
+ * FILE: ChartRenderer.tsx
+ * PATH: frontend/src/components/Renderers/ChartRenderer.tsx
+ * ============================================================
+ * DESCRIPTION:
+ *   Handles the rendering of interactive Plotly charts. 
+ *   Uses dynamic imports and factory pattern to ensure 
+ *   compatibility with Next.js SSR and client-side distribution.
+ *
+ * CREATED: 2026-04-25 | 10:00 AM
+ *
  * EDIT LOG:
  * ─────────────────────────────────────────────────────────────
- * [2026-04-25 | 10:00 AM] - Initial file created. Added ChartRenderer.
- * [2026-04-29 | 02:30 PM] - Refactored layout for glassmorphism theme.
- * [2026-05-08 | 12:24 PM] - Fixed ChunkLoadError by switching to 
- *                           react-plotly.js/factory and explicitly 
- *                           providing plotly.js-dist-min.
+ * [2026-04-25 | 10:00 AM] - Initial file created.
+ * [2026-05-08 | 12:24 PM] - Fixed ChunkLoadError by switching 
+ *                           to factory pattern.
+ * [2026-05-09 | 01:05 PM] - Standardized file header and JSDoc.
  * ─────────────────────────────────────────────────────────────
  */
 

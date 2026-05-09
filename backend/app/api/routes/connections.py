@@ -1,12 +1,19 @@
-"""
-File: connections.py
-Version: 1.1.0
-Created At: 2026-04-25
-Updated At: 2026-04-29
-Description: API Routes for database connection management. Provides endpoints for 
-             testing credentials and establishing long-lived sessions with 
-             automated schema introspection.
-"""
+# ================================================================
+# FILE: connections.py
+# PATH: backend/app/api/routes/connections.py
+# ================================================================
+# DESCRIPTION:
+#   API Routes for database connection management. Provides 
+#   endpoints for testing credentials and establishing 
+#   long-lived sessions with automated schema introspection.
+#
+# CREATED: 2026-04-25 | 10:00 AM
+#
+# EDIT LOG:
+# ----------------------------------------------------------------
+# [2026-04-25 | 10:00 AM] - Initial file created.
+# [2026-05-09 | 12:47 PM] - Standardized file header and comments.
+# ================================================================
 
 from fastapi import APIRouter
 

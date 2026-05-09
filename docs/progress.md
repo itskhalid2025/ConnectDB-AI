@@ -74,14 +74,9 @@ Each entry is appended when a milestone is completed.
 | File | Description |
 |---|---|
 | `.gitignore` | Python + Node + editor ignores |
-| `start-back.sh` | Bash launcher for backend (creates venv if needed) |
-
-### Still pending (next session)
-
-- `start-back.ps1` — PowerShell backend launcher
-- `start-front.sh` — Bash frontend launcher
-- `start-front.ps1` — PowerShell frontend launcher
-- `README.md` — Full usage documentation
+| `start-back.sh`, `.ps1`, `.bat` | One-click launchers for backend (cross-platform) |
+| `start-front.sh`, `.ps1`, `.bat` | One-click launchers for frontend (cross-platform) |
+| `Readme.md` | Full usage documentation and project overview |
 
 ---
 
@@ -114,3 +109,33 @@ Each entry is appended when a milestone is completed.
 - [x] Verify frontend type safety via ESLint.
 - [x] Document system prerequisites and run instructions.
 - [x] Document recent major work in instruction log.
+
+---
+
+## 2026-05-09 — Codebase Standardization & TypeScript Fixes
+
+**Session goal:** Bring the project into compliance with global rules for documentation, file headers, and project structure, while resolving critical TypeScript errors.
+
+### Fixes & Improvements
+
+| Area | Description |
+|---|---|
+| `frontend/src/global.d.ts` | Created global declaration for `plotly.js-dist-min` to resolve missing type definition errors. |
+| `frontend/src/components/ui/Card.tsx` | Fixed incompatible `title` property override by using `Omit<HTMLAttributes<HTMLDivElement>, 'title'>`. |
+| `docs/` | Commenced rebranding of `instruction.md` to `instructions.md` and creation of `project_overview.md`. |
+| All Files | Starting systematic update of mandatory file summary blocks and function-level comments. |
+
+### Tasks Completed
+
+- [x] Resolve `plotly.js-dist-min` TypeScript declaration error.
+- [x] Resolve `Card.tsx` property conflict error.
+- [x] Add mandatory header blocks to `Card.tsx` and `global.d.ts`.
+- [x] Rename `docs/instruction.md` to `docs/instructions.md` and standardize content.
+- [x] Create `docs/project_overview.md`.
+- [x] Apply mandatory summary blocks and comments to all files (Phase 1: Backend Core).
+- [x] Apply mandatory summary blocks and comments to all files (Phase 2: Frontend Core).
+- [x] Update documentation at `docs/instructions.md` and `docs/project_overview.md`.
+- [x] Update `docs/instructions.md` with Quick Start scripts and automated launchers.
+- [x] Mark automation scripts and `Readme.md` as completed in progress log.
+
+

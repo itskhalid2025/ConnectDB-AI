@@ -1,12 +1,19 @@
-"""
-File: pg_connector.py
-Version: 1.1.0
-Created At: 2026-04-25
-Updated At: 2026-04-29
-Description: PostgreSQL connectivity module. Handles low-level connection logic, 
-             authentication error mapping, and asynchronous connection pool management 
-             using asyncpg.
-"""
+# ================================================================
+# FILE: pg_connector.py
+# PATH: backend/app/services/pg_connector.py
+# ================================================================
+# DESCRIPTION:
+#   PostgreSQL connectivity module. Handles low-level connection 
+#   logic, authentication error mapping, and asynchronous 
+#   connection pool management using asyncpg.
+#
+# CREATED: 2026-04-25 | 10:00 AM
+#
+# EDIT LOG:
+# ----------------------------------------------------------------
+# [2026-04-25 | 10:00 AM] - Initial file created.
+# [2026-05-09 | 01:07 PM] - Standardized file header and comments.
+# ================================================================
 
 import asyncio
 import logging

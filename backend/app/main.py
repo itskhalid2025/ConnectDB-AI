@@ -1,11 +1,20 @@
-"""
-File: main.py
-Version: 1.1.0
-Created At: 2026-04-25
-Updated At: 2026-04-29
-Description: FastAPI Application entry point. Configures the global application state, 
-             middleware (CORS), exception handlers, and API route registrations.
-"""
+# ================================================================
+# FILE: main.py
+# PATH: backend/app/main.py
+# ================================================================
+# DESCRIPTION:
+#   FastAPI Application entry point. Configures the global 
+#   application state, middleware (CORS), exception handlers, 
+#   and API route registrations.
+#
+# CREATED: 2026-04-25 | 10:00 AM
+#
+# EDIT LOG:
+# ----------------------------------------------------------------
+# [2026-04-25 | 10:00 AM] - Initial file created.
+# [2026-04-29 | 02:00 PM] - Added CORS middleware and routes.
+# [2026-05-09 | 12:45 PM] - Standardized file header and comments.
+# ================================================================
 
 from contextlib import asynccontextmanager
 

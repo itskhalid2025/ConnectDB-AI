@@ -1,10 +1,19 @@
 /**
- * File: layout.tsx
- * Version: 1.1.0
- * Created At: 2026-04-25
- * Updated At: 2026-04-29
- * Description: Root layout for the Next.js application. Configures 
- *              global styles, metadata (SEO), and core HTML structure.
+ * ============================================================
+ * FILE: layout.tsx
+ * PATH: frontend/src/app/layout.tsx
+ * ============================================================
+ * DESCRIPTION:
+ *   Root layout for the Next.js application. Configures global 
+ *   styles, metadata (SEO), and core HTML structure.
+ *
+ * CREATED: 2026-04-25 | 10:00 AM
+ *
+ * EDIT LOG:
+ * ─────────────────────────────────────────────────────────────
+ * [2026-04-25 | 10:00 AM] - Initial file created.
+ * [2026-05-09 | 01:02 PM] - Standardized file header and JSDoc.
+ * ─────────────────────────────────────────────────────────────
  */
 
 import type { Metadata, Viewport } from 'next';
